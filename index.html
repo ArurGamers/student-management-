@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
@@ -73,7 +34,7 @@
       margin-bottom: 5px;
       font-weight: bold;
     }
-    select, input[type="text"], input[type="date"], input[type="checkbox"] {
+    select, input[type="text"], input[type="date"], input[type="checkbox"], input[type="password"] {
       width: 100%;
       padding: 8px;
       margin-bottom: 10px;
@@ -90,6 +51,10 @@
     }
     button:hover {
       background-color: #218838;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
     }
     table {
       width: 100%;
@@ -124,21 +89,28 @@
     #pdfContent {
       display: none;
     }
+    .error {
+      color: red;
+      font-size: 0.9em;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <div id="loginSection" class="login-section">
       <h2>Login</h2>
-      <div class="form-group">
-        <label for="username">Username:</label>
-        <input type="text" id="username" placeholder="Masukkan username">
-      </div>
-      <div class="form-group">
-        <label for="password">Password:</label>
-        <input type="password" id="password" placeholder="Masukkan password">
-      </div>
-      <button onclick="login()">Login</button>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">Username:</label>
+          <input type="text" id="username" placeholder="Masukkan username" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Password:</label>
+          <input type="password" id="password" placeholder="Masukkan password" required>
+        </div>
+        <button type="submit">Login</button>
+        <p id="loginError" class="error hidden">Username atau password salah!</p>
+      </form>
     </div>
 
     <div id="mainSection" class="hidden">
@@ -161,7 +133,7 @@
         </div>
         <div class="form-group">
           <label for="parentWhatsApp">Nomor WhatsApp Orang Tua:</label>
-          <input type="text" id="parentWhatsApp" placeholder="Masukkan nomor WhatsApp">
+          <input type="text" id="parentWhatsApp" placeholder="Masukkan nomor WhatsApp" readonly>
         </div>
         <div class="form-group">
           <label for="case">Kasus:</label>
@@ -175,15 +147,15 @@
           <label><input type="checkbox" id="lateStatus"> Status Terlambat</label>
         </div>
         <div class="form-group">
-          <label><input type="checkbox" id="earlyLeavePermission"> Izin Pulang</label>
+          <label><input type="checkbox" id="earlyLeavePermission" onclick="toggleReason()"> Izin Pulang</label>
+        </div>
+        <div class="form-group hidden" id="reasonGroup">
+          <label for="reason">Alasan:</label>
+          <input type="text" id="reason" placeholder="Masukkan alasan">
         </div>
         <div class="form-group">
           <label for="date">Tanggal:</label>
-          <input type="date" id="date">
-        </div>
-        <div class="form-group">
-          <label for="reason">Alasan:</label>
-          <input type="text" id="reason" placeholder="Masukkan alasan">
+          <input type="date" id="date" required>
         </div>
         <div class="form-group">
           <label for="teacherSignature">Tanda Tangan Guru Mata Pelajaran:</label>
@@ -245,23 +217,35 @@
   </div>
 
   <script>
-    const SHEETY_STUDENTS_API_URL = 'https://api.sheety.co/c39dd8e7c916b60608a1fdef0dbb9b88/studentDatabase/students';
-    const SHEETY_CLASS_MAPPING_API_URL = 'https://api.sheety.co/c39dd8e7c916b60608a1fdef0dbb9b88/studentDatabase/classMapping';
-    const FIXED_WHATSAPP_NUMBER = '6285730809839';
-    const SCHOOL_LOGO_URL = 'https://drive.google.com/file/d/1Ufecmx7iQCjveZmI6F4AW7xnsAU-fFQi/view?usp=sharing';
+    const SHEETY_STUDENTS_API_URL = 'https://api.sheety.co/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/StudentManagement/Students';
+    const SHEETY_CLASS_MAPPING_API_URL = 'https://api.sheety.co/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/StudentManagement/ClassMapping';
+    const FIXED_WHATSAPP_NUMBER = '6281234567890';
+    const SCHOOL_LOGO_URL = 'https://drive.google.com/uc?export=download&id=1A2B3C4D5E6F7G8H9I0J';
 
     let classMapping = [];
 
+    // Login handler
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      login();
+    });
+
     function login() {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      if (username === 'admin' && password === 'password123') {
-        document.getElementById('loginSection').classList.add('hidden');
-        document.getElementById('mainSection').classList.remove('hidden');
-        loadData();
-        loadClassDropdown();
-      } else {
-        alert('Username atau password salah!');
+      try {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        if (username === 'admin' && password === 'password123') {
+          document.getElementById('loginSection').classList.add('hidden');
+          document.getElementById('mainSection').classList.remove('hidden');
+          document.getElementById('loginError').classList.add('hidden');
+          loadData();
+          loadClassDropdown();
+        } else {
+          document.getElementById('loginError').classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error('Login error:', err);
+        alert('Terjadi kesalahan saat login: ' + err.message);
       }
     }
 
@@ -270,128 +254,207 @@
       document.getElementById('mainSection').classList.add('hidden');
       document.getElementById('username').value = '';
       document.getElementById('password').value = '';
+      document.getElementById('loginError').classList.add('hidden');
+    }
+
+    function toggleReason() {
+      const earlyLeave = document.getElementById('earlyLeavePermission').checked;
+      document.getElementById('reasonGroup').classList.toggle('hidden', !earlyLeave);
     }
 
     async function fetchStudents() {
-      const response = await fetch(SHEETY_STUDENTS_API_URL);
-      const data = await response.json();
-      return data.students; // Akses array di dalam objek "students"
-}
+      try {
+        const response = await fetch(SHEETY_STUDENTS_API_URL);
+        if (!response.ok) throw new Error('Gagal mengambil data siswa');
+        const data = await response.json();
+        return data.students || [];
+      } catch (err) {
+        console.error('Fetch students error:', err);
+        alert('Error mengambil data siswa: ' + err.message);
+        return [];
+      }
+    }
 
-    aasync function fetchClassMapping() {
-      const response = await fetch(SHEETY_CLASS_MAPPING_API_URL);
-      const data = await response.json();
-      return data.classMappings; // Akses array di dalam objek "classMappings"
-}
+    async function fetchClassMapping() {
+      try {
+        const response = await fetch(SHEETY_CLASS_MAPPING_API_URL);
+        if (!response.ok) throw new Error('Gagal mengambil mapping kelas');
+        const data = await response.json();
+        return data.classMappings || [];
+      } catch (err) {
+        console.error('Fetch class mapping error:', err);
+        alert('Error mengambil mapping kelas: ' + err.message);
+        return [];
+      }
+    }
 
     async function loadClassDropdown() {
-      const classes = await fetchClassMapping();
-      const classSelect = document.getElementById('classSelect');
-      classes.forEach(cls => {
-        const option = document.createElement('option');
-        option.value = cls.class;
-        option.textContent = cls.class;
-        classSelect.appendChild(option);
-      });
+      try {
+        classMapping = await fetchClassMapping();
+        const classSelect = document.getElementById('classSelect');
+        classSelect.innerHTML = '<option value="">Pilih Kelas</option>';
+        classMapping.forEach(cls => {
+          const option = document.createElement('option');
+          option.value = cls.class;
+          option.textContent = cls.class;
+          classSelect.appendChild(option);
+        });
+      } catch (err) {
+        console.error('Load class dropdown error:', err);
+      }
     }
 
     async function updateStudentDropdown() {
-      const classSelect = document.getElementById('classSelect').value;
-      const studentSelect = document.getElementById('studentSelect');
-      studentSelect.innerHTML = '<option value="">Pilih Siswa</option>';
-      const students = await fetchStudents();
-      const filteredStudents = students.filter(student => student.class === classSelect);
-      const uniqueNames = [...new Set(filteredStudents.map(student => student.name))];
-      uniqueNames.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        studentSelect.appendChild(option);
-      });
+      try {
+        const classSelect = document.getElementById('classSelect').value;
+        const studentSelect = document.getElementById('studentSelect');
+        const parentWhatsApp = document.getElementById('parentWhatsApp');
+        studentSelect.innerHTML = '<option value="">Pilih Siswa</option>';
+        parentWhatsApp.value = '';
+        if (!classSelect) return;
 
-      const selectedClass = classMapping.find(cls => cls.class === classSelect);
-      document.getElementById('classTeacherSignature').value = selectedClass ? selectedClass.classTeacher : '';
+        const students = await fetchStudents();
+        const filteredStudents = students.filter(student => student.class === classSelect);
+        const uniqueNames = [...new Set(filteredStudents.map(student => student.name))];
+        uniqueNames.forEach(name => {
+          const option = document.createElement('option');
+          option.value = name;
+          option.textContent = name;
+          studentSelect.appendChild(option);
+        });
+
+        studentSelect.onchange = () => {
+          const selectedName = studentSelect.value;
+          const student = filteredStudents.find(s => s.name === selectedName);
+          parentWhatsApp.value = student ? student.parentWhatsApp : '';
+        };
+
+        const selectedClass = classMapping.find(cls => cls.class === classSelect);
+        document.getElementById('classTeacherSignature').value = selectedClass ? selectedClass.classTeacher : '';
+      } catch (err) {
+        console.error('Update student dropdown error:', err);
+      }
     }
 
     async function addOrUpdateData() {
-      const formData = {
-        class: document.getElementById('classSelect').value,
-        name: document.getElementById('studentSelect').value,
-        parentWhatsApp: document.getElementById('parentWhatsApp').value,
-        case: document.getElementById('case').value,
-        score: document.getElementById('score').value,
-        lateStatus: document.getElementById('lateStatus').checked ? 'Yes' : 'No',
-        earlyLeavePermission: document.getElementById('earlyLeavePermission').checked ? 'Yes' : 'No',
-        date: document.getElementById('date').value,
-        reason: document.getElementById('reason').value,
-        teacherSignature: document.getElementById('teacherSignature').value,
-        picketTeacherSignature: document.getElementById('picketTeacherSignature').value,
-        classTeacherSignature: document.getElementById('classTeacherSignature').value
-      };
+      try {
+        const formData = {
+          class: document.getElementById('classSelect').value,
+          name: document.getElementById('studentSelect').value,
+          parentWhatsApp: document.getElementById('parentWhatsApp').value,
+          case: document.getElementById('case').value,
+          score: document.getElementById('score').value,
+          lateStatus: document.getElementById('lateStatus').checked ? 'Yes' : 'No',
+          earlyLeavePermission: document.getElementById('earlyLeavePermission').checked ? 'Yes' : 'No',
+          date: document.getElementById('date').value,
+          reason: document.getElementById('reason').value,
+          teacherSignature: document.getElementById('teacherSignature').value,
+          picketTeacherSignature: document.getElementById('picketTeacherSignature').value,
+          classTeacherSignature: document.getElementById('classTeacherSignature').value
+        };
 
-      const payload = { student: formData };
+        if (!formData.class || !formData.name || !formData.date) {
+          alert('Kelas, nama, dan tanggal harus diisi!');
+          return;
+        }
 
-      await fetch(SHEETY_STUDENTS_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+        const payload = { student: formData };
+        await fetch(SHEETY_STUDENTS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
 
-      alert('Data berhasil ditambahkan!');
-      loadData();
+        // Kirim notifikasi WhatsApp jika ada kasus, terlambat, atau izin pulang
+        if (formData.case || formData.lateStatus === 'Yes' || formData.earlyLeavePermission === 'Yes') {
+          let message = `Notifikasi SMA Negeri 1 Contoh\n`;
+          message += `Kepada Orang Tua/Wali ${formData.name} (Kelas ${formData.class}),\n`;
+          message += `Tanggal: ${formData.date}\n`;
+          if (formData.case) message += `Kasus: ${formData.case}\n`;
+          if (formData.score) message += `Skor: ${formData.score}\n`;
+          if (formData.lateStatus === 'Yes') message += `Status: Terlambat\n`;
+          if (formData.earlyLeavePermission === 'Yes') message += `Izin Pulang: ${formData.reason}\n`;
+          const url = `https://wa.me/${FIXED_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+          window.open(url, '_blank');
+        }
+
+        alert('Data berhasil ditambahkan!');
+        loadData();
+        document.getElementById('studentSelect').innerHTML = '<option value="">Pilih Siswa</option>';
+        document.getElementById('parentWhatsApp').value = '';
+        document.getElementById('classTeacherSignature').value = '';
+        document.getElementById('reasonGroup').classList.add('hidden');
+      } catch (err) {
+        console.error('Add/update data error:', err);
+        alert('Error menyimpan data: ' + err.message);
+      }
     }
 
     async function loadData() {
-      const students = await fetchStudents();
-      const tbody = document.querySelector('#dataTable tbody');
-      tbody.innerHTML = '';
-      students.forEach(student => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${student.class}</td>
-          <td>${student.name}</td>
-          <td>${student.parentWhatsApp}</td>
-          <td>${student.case}</td>
-          <td>${student.score}</td>
-          <td>${student.lateStatus}</td>
-          <td>${student.earlyLeavePermission}</td>
-          <td>${student.date}</td>
-          <td>${student.reason}</td>
-          <td>${student.teacherSignature}</td>
-          <td>${student.picketTeacherSignature}</td>
-          <td>${student.classTeacherSignature}</td>
-          <td>
-            <button class="print-btn" onclick="printPermissionLetter(
-              '${student.name}',
-              '${student.class}',
-              '${student.date}',
-              '${student.reason}',
-              '${student.teacherSignature}',
-              '${student.picketTeacherSignature}',
-              '${student.classTeacherSignature}'
-            )">Cetak Surat Izin</button>
-          </td>
-        `;
-        tbody.appendChild(row);
-      });
+      try {
+        const students = await fetchStudents();
+        const tbody = document.querySelector('#dataTable tbody');
+        tbody.innerHTML = '';
+        students.forEach(student => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${student.class || '-'}</td>
+            <td>${student.name || '-'}</td>
+            <td>${student.parentWhatsApp || '-'}</td>
+            <td>${student.case || '-'}</td>
+            <td>${student.score || '-'}</td>
+            <td>${student.lateStatus || 'No'}</td>
+            <td>${student.earlyLeavePermission || 'No'}</td>
+            <td>${student.date || '-'}</td>
+            <td>${student.reason || '-'}</td>
+            <td>${student.teacherSignature || '-'}</td>
+            <td>${student.picketTeacherSignature || '-'}</td>
+            <td>${student.classTeacherSignature || '-'}</td>
+            <td>
+              ${student.earlyLeavePermission === 'Yes' ? `
+                <button class="print-btn" onclick="printPermissionLetter(
+                  '${student.name}',
+                  '${student.class}',
+                  '${student.date}',
+                  '${student.reason}',
+                  '${student.teacherSignature}',
+                  '${student.picketTeacherSignature}',
+                  '${student.classTeacherSignature}'
+                )">Cetak Surat Izin</button>
+              ` : ''}
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (err) {
+        console.error('Load data error:', err);
+      }
     }
 
     function printPermissionLetter(name, className, date, reason, teacherSignature, picketTeacherSignature, classTeacherSignature) {
-      document.getElementById('pdfStudentName').textContent = name;
-      document.getElementById('pdfClass').textContent = className;
-      document.getElementById('pdfDate').textContent = date;
-      document.getElementById('pdfReason').textContent = reason;
-      document.getElementById('pdfTeacherSignature').textContent = teacherSignature;
-      document.getElementById('pdfPicketTeacherSignature').textContent = picketTeacherSignature;
-      document.getElementById('pdfClassTeacherSignature').textContent = classTeacherSignature;
+      try {
+        document.getElementById('pdfStudentName').textContent = name || '-';
+        document.getElementById('pdfClass').textContent = className || '-';
+        document.getElementById('pdfDate').textContent = date || '-';
+        document.getElementById('pdfReason').textContent = reason || '-';
+        document.getElementById('pdfTeacherSignature').textContent = teacherSignature || '-';
+        document.getElementById('pdfPicketTeacherSignature').textContent = picketTeacherSignature || '-';
+        document.getElementById('pdfClassTeacherSignature').textContent = classTeacherSignature || '-';
 
-      const element = document.getElementById('pdfContent');
-      html2pdf().from(element).set({
-        filename: `Surat_Izin_${name}_${date}.pdf`,
-        margin: 20,
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).save();
+        const element = document.getElementById('pdfContent');
+        html2pdf().from(element).set({
+          filename: `Surat_Izin_${name}_${date}.pdf`,
+          margin: 20,
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).save();
+      } catch (err) {
+        console.error('Print error:', err);
+        alert('Error mencetak surat: ' + err.message);
+      }
     }
+
+    // Set tanggal default ke hari ini
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
   </script>
 </body>
 </html>
