@@ -40,529 +40,358 @@
         </script><!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pencatat Kasus dan Skor Siswa</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <style>
-        table {
-            border-collapse: collapse;
-            width: 100%;
-        }
-        th, td {
-            border: 1px solid #e2e8f0;
-            padding: 8px;
-            text-align: left;
-        }
-        #whatsappFrame {
-            display: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Manajemen Siswa</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f4f4f4;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      text-align: center;
+      color: #333;
+    }
+    .login-section, .form-section, .table-section {
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    select, input[type="text"], input[type="date"], input[type="checkbox"] {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    .hidden {
+      display: none;
+    }
+    .logout-btn {
+      background-color: #dc3545;
+      margin-top: 10px;
+    }
+    .logout-btn:hover {
+      background-color: #c82333;
+    }
+    .print-btn {
+      background-color: #007bff;
+      margin-left: 10px;
+    }
+    .print-btn:hover {
+      background-color: #0056b3;
+    }
+    #pdfContent {
+      display: none;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 font-sans">
-    <!-- Login Screen -->
-    <div id="loginScreen" class="flex items-center justify-center min-h-screen">
-        <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-sm">
-            <h2 class="text-2xl font-bold text-center mb-4">Login</h2>
-            <form id="loginForm" class="space-y-4">
-                <input type="text" id="username" placeholder="Username" class="w-full p-2 border rounded-md" required>
-                <input type="password" id="password" placeholder="Password" class="w-full p-2 border rounded-md" required>
-                <button type="submit" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 w-full">Login</button>
-                <p id="loginError" class="text-red-500 text-sm hidden">Username atau password salah.</p>
-            </form>
-        </div>
+<body>
+  <div class="container">
+    <div id="loginSection" class="login-section">
+      <h2>Login</h2>
+      <div class="form-group">
+        <label for="username">Username:</label>
+        <input type="text" id="username" placeholder="Masukkan username">
+      </div>
+      <div class="form-group">
+        <label for="password">Password:</label>
+        <input type="password" id="password" placeholder="Masukkan password">
+      </div>
+      <button onclick="login()">Login</button>
     </div>
 
-    <!-- Main Content -->
-    <div id="mainContent" class="container mx-auto p-4 max-w-6xl hidden">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Pencatat Kasus dan Skor Siswa</h1>
-        
-        <!-- Form Input -->
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <form id="studentForm" class="space-y-4">
-                <div>
-                    <select id="class" class="w-full p-2 border rounded-md" required>
-                        <option value="">Pilih Kelas</option>
-                    </select>
-                    <p id="classError" class="text-red-500 text-sm hidden">Kelas harus dipilih.</p>
-                </div>
-                <div>
-                    <select id="name" class="w-full p-2 border rounded-md" required>
-                        <option value="">Pilih Nama Siswa</option>
-                    </select>
-                    <p id="nameError" class="text-red-500 text-sm hidden">Nama harus dipilih.</p>
-                </div>
-                <div>
-                    <input type="tel" id="phone" placeholder="Nomor WhatsApp Orang Tua" class="w-full p-2 border rounded-md" readonly>
-                    <p id="phoneError" class="text-red-500 text-sm hidden">Nomor telepon tidak valid.</p>
-                </div>
-                <div>
-                    <input type="text" id="case" placeholder="Kasus" class="w-full p-2 border rounded-md">
-                    <p id="caseError" class="text-red-500 text-sm hidden">Kasus tidak boleh kosong jika diisi.</p>
-                </div>
-                <div>
-                    <input type="number" id="score" placeholder="Skor (0-100)" class="w-full p-2 border rounded-md">
-                    <p id="scoreError" class="text-red-500 text-sm hidden">Skor harus antara 0 dan 100.</p>
-                </div>
-                <div>
-                    <input type="date" id="date" class="w-full p-2 border rounded-md" required>
-                    <p id="dateError" class="text-red-500 text-sm hidden">Tanggal harus diisi.</p>
-                </div>
-                <div>
-                    <label class="flex items-center">
-                        <input type="checkbox" id="lateStatus" class="mr-2">
-                        <span>Terlambat</span>
-                    </label>
-                </div>
-                <div>
-                    <label class="flex items-center">
-                        <input type="checkbox" id="earlyLeave" class="mr-2">
-                        <span>Izin Pulang Mendahului</span>
-                    </label>
-                </div>
-                <div id="reasonDiv" class="hidden">
-                    <input type="text" id="reason" placeholder="Alasan Izin Pulang (misalnya: Acara Keluarga)" class="w-full p-2 border rounded-md">
-                    <p id="reasonError" class="text-red-500 text-sm hidden">Alasan harus diisi jika izin pulang dipilih.</p>
-                </div>
-                <button type="submit" class="bg-green-500 text-white p-2 rounded-md hover:bg-green-600 w-full">Tambah atau Perbarui Data</button>
-            </form>
-        </div>
+    <div id="mainSection" class="hidden">
+      <h1>Sistem Manajemen Siswa</h1>
+      <button class="logout-btn" onclick="logout()">Logout</button>
 
-        <!-- Pencarian dan Export -->
-        <div class="bg-white p-4 rounded-lg shadow-md mb-6 flex flex-col sm:flex-row gap-4">
-            <input type="text" id="search" placeholder="Cari kelas, nama, kasus..." class="flex-grow p-2 border rounded-md">
-            <button id="exportCsv" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">Export ke CSV</button>
+      <div class="form-section">
+        <h2>Form Input Data</h2>
+        <div class="form-group">
+          <label for="classSelect">Pilih Kelas:</label>
+          <select id="classSelect" onchange="updateStudentDropdown()">
+            <option value="">Pilih Kelas</option>
+          </select>
         </div>
-
-        <!-- Tabel Data -->
-        <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
-            <table id="studentTable">
-                <thead>
-                    <tr class="bg-blue-500 text-white">
-                        <th class="p-2 cursor-pointer" onclick="sortTable(0)">Kelas</th>
-                        <th class="p-2 cursor-pointer" onclick="sortTable(1)">Nama</th>
-                        <th class="p-2">No. WhatsApp</th>
-                        <th class="p-2">Kasus</th>
-                        <th class="p-2">Skor</th>
-                        <th class="p-2">Terlambat</th>
-                        <th class="p-2">Izin Pulang</th>
-                        <th class="p-2">Alasan</th>
-                        <th class="p-2 cursor-pointer" onclick="sortTable(7)">Tanggal</th>
-                        <th class="p-2">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody id="studentList"></tbody>
-            </table>
+        <div class="form-group">
+          <label for="studentSelect">Pilih Nama Siswa:</label>
+          <select id="studentSelect">
+            <option value="">Pilih Siswa</option>
+          </select>
         </div>
+        <div class="form-group">
+          <label for="parentWhatsApp">Nomor WhatsApp Orang Tua:</label>
+          <input type="text" id="parentWhatsApp" placeholder="Masukkan nomor WhatsApp">
+        </div>
+        <div class="form-group">
+          <label for="case">Kasus:</label>
+          <input type="text" id="case" placeholder="Masukkan kasus">
+        </div>
+        <div class="form-group">
+          <label for="score">Skor:</label>
+          <input type="text" id="score" placeholder="Masukkan skor">
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="lateStatus"> Status Terlambat</label>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="earlyLeavePermission"> Izin Pulang</label>
+        </div>
+        <div class="form-group">
+          <label for="date">Tanggal:</label>
+          <input type="date" id="date">
+        </div>
+        <div class="form-group">
+          <label for="reason">Alasan:</label>
+          <input type="text" id="reason" placeholder="Masukkan alasan">
+        </div>
+        <div class="form-group">
+          <label for="teacherSignature">Tanda Tangan Guru Mata Pelajaran:</label>
+          <input type="text" id="teacherSignature" placeholder="Masukkan nama guru">
+        </div>
+        <div class="form-group">
+          <label for="picketTeacherSignature">Tanda Tangan Guru Piket:</label>
+          <input type="text" id="picketTeacherSignature" placeholder="Masukkan nama guru piket">
+        </div>
+        <div class="form-group">
+          <label for="classTeacherSignature">Tanda Tangan Wali Kelas:</label>
+          <input type="text" id="classTeacherSignature" readonly>
+        </div>
+        <button onclick="addOrUpdateData()">Tambah atau Perbarui Data</button>
+      </div>
 
-        <!-- Iframe tersembunyi untuk WhatsApp -->
-        <iframe id="whatsappFrame"></iframe>
+      <div class="table-section">
+        <h2>Data Siswa</h2>
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th>Kelas</th>
+              <th>Nama</th>
+              <th>WhatsApp Orang Tua</th>
+              <th>Kasus</th>
+              <th>Skor</th>
+              <th>Terlambat</th>
+              <th>Izin Pulang</th>
+              <th>Tanggal</th>
+              <th>Alasan</th>
+              <th>Guru Mata Pelajaran</th>
+              <th>Guru Piket</th>
+              <th>Wali Kelas</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
 
-    <script>
-        const loginScreen = document.getElementById('loginScreen');
-        const mainContent = document.getElementById('mainContent');
-        const loginForm = document.getElementById('loginForm');
-        const studentForm = document.getElementById('studentForm');
-        const studentList = document.getElementById('studentList');
-        const searchInput = document.getElementById('search');
-        const exportCsvBtn = document.getElementById('exportCsv');
-        const whatsappFrame = document.getElementById('whatsappFrame');
-        const classSelect = document.getElementById('class');
-        const nameSelect = document.getElementById('name');
-        const phoneInput = document.getElementById('phone');
-        const earlyLeaveCheckbox = document.getElementById('earlyLeave');
-        const reasonDiv = document.getElementById('reasonDiv');
-        let students = [];
-        let editRowIndex = null;
+    <div id="pdfContent">
+      <div style="text-align: center;">
+        <img src="https://drive.google.com/uc?export=download&id=1A2B3C4D5E6F7G8H9I0J" alt="School Logo" style="width: 100px;">
+        <h2>SMA Negeri 1 Contoh</h2>
+        <p>Jl. Contoh No. 123, Kota Contoh</p>
+        <h3>Surat Izin Pulang</h3>
+      </div>
+      <p>Kami yang bertanda tangan di bawah ini:</p>
+      <p><strong>Nama Siswa:</strong> <span id="pdfStudentName"></span></p>
+      <p><strong>Kelas:</strong> <span id="pdfClass"></span></p>
+      <p><strong>Tanggal:</strong> <span id="pdfDate"></span></p>
+      <p><strong>Alasan:</strong> <span id="pdfReason"></span></p>
+      <p>Menyatakan bahwa siswa tersebut diizinkan pulang dengan alasan tersebut di atas.</p>
+      <p style="margin-top: 50px;"><strong>Guru Mata Pelajaran:</strong> <span id="pdfTeacherSignature"></span></p>
+      <p><strong>Guru Piket:</strong> <span id="pdfPicketTeacherSignature"></span></p>
+      <p><strong>Wali Kelas:</strong> <span id="pdfClassTeacherSignature"></span></p>
+    </div>
+  </div>
 
-        // Konfigurasi SheetDB
-        const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/9tnfjo3eoj9my'; // Ganti dengan SheetDB API URL
-        // Nomor WhatsApp tetap untuk semua pesan
-        const FIXED_WHATSAPP_NUMBER = '6285730809839'; // Ganti dengan nomor WhatsApp sekolah/admin
+  <script>
+    const SHEETY_STUDENTS_API_URL = 'https://api.sheety.co/c39dd8e7c916b60608a1fdef0dbb9b88/studentDatabase/students';
+    const SHEETY_CLASS_MAPPING_API_URL = 'https://api.sheety.co/c39dd8e7c916b60608a1fdef0dbb9b88/studentDatabase/classMapping';
+    const FIXED_WHATSAPP_NUMBER = '6285730809839';
+    const SCHOOL_LOGO_URL = 'https://drive.google.com/file/d/1Ufecmx7iQCjveZmI6F4AW7xnsAU-fFQi/view?usp=sharing';
 
-        // Login sederhana (statis)
-        loginForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            if (username === 'admin' && password === 'password123') {
-                loginScreen.classList.add('hidden');
-                mainContent.classList.remove('hidden');
-                fetchClasses();
-                fetchStudents();
-            } else {
-                document.getElementById('loginError').classList.remove('hidden');
-            }
-        });
+    let classMapping = [];
 
-        // Tampilkan input alasan jika izin pulang dipilih
-        earlyLeaveCheckbox.addEventListener('change', function() {
-            reasonDiv.classList.toggle('hidden', !this.checked);
-        });
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      if (username === 'admin' && password === 'password123') {
+        document.getElementById('loginSection').classList.add('hidden');
+        document.getElementById('mainSection').classList.remove('hidden');
+        loadData();
+        loadClassDropdown();
+      } else {
+        alert('Username atau password salah!');
+      }
+    }
 
-        // Validasi input
-        function validateInput(cls, name, phone, caseInput, score, date, lateStatus, earlyLeave, reason) {
-            let isValid = true;
-            document.getElementById('classError').classList.add('hidden');
-            document.getElementById('nameError').classList.add('hidden');
-            document.getElementById('phoneError').classList.add('hidden');
-            document.getElementById('caseError').classList.add('hidden');
-            document.getElementById('scoreError').classList.add('hidden');
-            document.getElementById('dateError').classList.add('hidden');
-            document.getElementById('reasonError').classList.add('hidden');
+    function logout() {
+      document.getElementById('loginSection').classList.remove('hidden');
+      document.getElementById('mainSection').classList.add('hidden');
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+    }
 
-            if (!cls) {
-                document.getElementById('classError').classList.remove('hidden');
-                isValid = false;
-            }
-            if (!name) {
-                document.getElementById('nameError').classList.remove('hidden');
-                isValid = false;
-            }
-            if (!phone.match(/^\+?\d{10,15}$/)) {
-                document.getElementById('phoneError').classList.remove('hidden');
-                isValid = false;
-            }
-            if (caseInput && !caseInput.trim()) {
-                document.getElementById('caseError').classList.remove('hidden');
-                isValid = false;
-            }
-            if (score !== '' && (score < 0 || score > 100 || isNaN(score))) {
-                document.getElementById('scoreError').classList.remove('hidden');
-                isValid = false;
-            }
-            if (!date) {
-                document.getElementById('dateError').classList.remove('hidden');
-                isValid = false;
-            }
-            if (earlyLeave === 'Yes' && !reason.trim()) {
-                document.getElementById('reasonError').classList.remove('hidden');
-                isValid = false;
-            }
-            return isValid;
-        }
+    async function fetchStudents() {
+      const response = await fetch(SHEETY_STUDENTS_API_URL);
+      const data = await response.json();
+      return data.students; // Akses array di dalam objek "students"
+}
 
-        // Ambil daftar kelas
-        async function fetchClasses() {
-            try {
-                const response = await fetch(SHEETDB_API_URL);
-                if (!response.ok) throw new Error('Gagal mengambil daftar kelas');
-                const data = await response.json();
-                const classes = [...new Set(data.map(row => row.Class))];
-                classSelect.innerHTML = '<option value="">Pilih Kelas</option>';
-                classes.forEach(cls => {
-                    const option = document.createElement('option');
-                    option.value = cls;
-                    option.textContent = cls;
-                    classSelect.appendChild(option);
-                });
-            } catch (error) {
-                alert('Error mengambil daftar kelas: ' + error.message);
-            }
-        }
+    aasync function fetchClassMapping() {
+      const response = await fetch(SHEETY_CLASS_MAPPING_API_URL);
+      const data = await response.json();
+      return data.classMappings; // Akses array di dalam objek "classMappings"
+}
 
-        // Ambil daftar siswa berdasarkan kelas
-        async function fetchStudentsByClass(cls) {
-            try {
-                const response = await fetch(`${SHEETDB_API_URL}?Class=${encodeURIComponent(cls)}`);
-                if (!response.ok) throw new Error('Gagal mengambil daftar siswa');
-                const data = await response.json();
-                nameSelect.innerHTML = '<option value="">Pilih Nama Siswa</option>';
-                data.forEach(row => {
-                    const option = document.createElement('option');
-                    option.value = row.Name;
-                    option.textContent = row.Name;
-                    option.dataset.phone = row.ParentWhatsApp;
-                    nameSelect.appendChild(option);
-                });
-            } catch (error) {
-                alert('Error mengambil daftar siswa: ' + error.message);
-            }
-        }
+    async function loadClassDropdown() {
+      const classes = await fetchClassMapping();
+      const classSelect = document.getElementById('classSelect');
+      classes.forEach(cls => {
+        const option = document.createElement('option');
+        option.value = cls.class;
+        option.textContent = cls.class;
+        classSelect.appendChild(option);
+      });
+    }
 
-        // Ambil semua data siswa
-        async function fetchStudents() {
-            try {
-                const response = await fetch(SHEETDB_API_URL);
-                if (!response.ok) throw new Error('Gagal mengambil data siswa');
-                const data = await response.json();
-                students = data.map((row, index) => ({
-                    id: index + 2, // Baris dimulai dari 2 karena header
-                    Class: row.Class,
-                    Name: row.Name,
-                    ParentWhatsApp: row.ParentWhatsApp,
-                    Case: row.Case,
-                    Score: row.Score,
-                    LateStatus: row.LateStatus,
-                    EarlyLeavePermission: row.EarlyLeavePermission,
-                    Date: row.Date,
-                    Reason: row.Reason,
-                    TeacherSignature: row.TeacherSignature,
-                    PicketTeacherSignature: row.PicketTeacherSignature,
-                    ClassTeacherSignature: row.ClassTeacherSignature
-                }));
-                renderTable();
-            } catch (error) {
-                alert('Error mengambil data siswa: ' + error.message);
-            }
-        }
+    async function updateStudentDropdown() {
+      const classSelect = document.getElementById('classSelect').value;
+      const studentSelect = document.getElementById('studentSelect');
+      studentSelect.innerHTML = '<option value="">Pilih Siswa</option>';
+      const students = await fetchStudents();
+      const filteredStudents = students.filter(student => student.class === classSelect);
+      const uniqueNames = [...new Set(filteredStudents.map(student => student.name))];
+      uniqueNames.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        studentSelect.appendChild(option);
+      });
 
-        // Render tabel
-        function renderTable(data = students) {
-            studentList.innerHTML = '';
-            data.forEach((student, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${student.Class}</td>
-                    <td>${student.Name}</td>
-                    <td>${student.ParentWhatsApp}</td>
-                    <td>${student.Case || '-'}</td>
-                    <td>${student.Score || '-'}</td>
-                    <td>${student.LateStatus || 'No'}</td>
-                    <td>${student.EarlyLeavePermission || 'No'}</td>
-                    <td>${student.Reason || '-'}</td>
-                    <td>${student.Date || '-'}</td>
-                    <td>
-                        <button onclick="editStudent(${index})" class="bg-yellow-500 text-white p-1 rounded hover:bg-yellow-600 mr-2">Edit</button>
-                        <button onclick="deleteStudent(${index})" class="bg-red-500 text-white p-1 rounded hover:bg-red-600 mr-2">Hapus</button>
-                        ${student.EarlyLeavePermission === 'Yes' ? `<button onclick="printPermit(${index})" class="bg-purple-500 text-white p-1 rounded hover:bg-purple-600">Cetak Surat Izin</button>` : ''}
-                    </td>
-                `;
-                studentList.appendChild(row);
-            });
-        }
+      const selectedClass = classMapping.find(cls => cls.class === classSelect);
+      document.getElementById('classTeacherSignature').value = selectedClass ? selectedClass.classTeacher : '';
+    }
 
-        // Sort tabel
-        let sortDirection = 1;
-        let lastSortedColumn = -1;
-        window.sortTable = function(col) {
-            if (lastSortedColumn === col) {
-                sortDirection *= -1;
-            } else {
-                sortDirection = 1;
-            }
-            lastSortedColumn = col;
-            students.sort((a, b) => {
-                const valA = a[Object.keys(a)[col + 1]] || ''; // +1 karena id di awal
-                const valB = b[Object.keys(b)[col + 1]] || '';
-                return sortDirection * (valA.toString().localeCompare(valB.toString()));
-            });
-            renderTable();
-        };
+    async function addOrUpdateData() {
+      const formData = {
+        class: document.getElementById('classSelect').value,
+        name: document.getElementById('studentSelect').value,
+        parentWhatsApp: document.getElementById('parentWhatsApp').value,
+        case: document.getElementById('case').value,
+        score: document.getElementById('score').value,
+        lateStatus: document.getElementById('lateStatus').checked ? 'Yes' : 'No',
+        earlyLeavePermission: document.getElementById('earlyLeavePermission').checked ? 'Yes' : 'No',
+        date: document.getElementById('date').value,
+        reason: document.getElementById('reason').value,
+        teacherSignature: document.getElementById('teacherSignature').value,
+        picketTeacherSignature: document.getElementById('picketTeacherSignature').value,
+        classTeacherSignature: document.getElementById('classTeacherSignature').value
+      };
 
-        // Kirim ke WhatsApp
-        function sendToWhatsApp(student) {
-            let message = `Notifikasi dari SMA Negeri 1 Contoh\n`;
-            message += `Kepada Orang Tua/Wali ${student.Name} (Kelas ${student.Class}),\n`;
-            message += `Tanggal: ${student.Date}\n`;
-            if (student.Case) {
-                message += `Siswa Anda memiliki catatan:\n- Kasus: ${student.Case}\n- Skor: ${student.Score}\n`;
-            }
-            if (student.LateStatus === 'Yes') {
-                message += `- Status: Terlambat\n`;
-            }
-            if (student.EarlyLeavePermission === 'Yes') {
-                message += `- Izin: Pulang Mendahului\n- Alasan: ${student.Reason}\n`;
-            }
-            message += `Terima kasih.`;
-            const url = `https://wa.me/${FIXED_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
-            whatsappFrame.src = url;
-            window.open(url, '_blank');
-        }
+      const payload = { student: formData };
 
-        // Cetak surat izin
-        window.printPermit = function(index) {
-            const student = students[index];
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+      await fetch(SHEETY_STUDENTS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-            // Header
-            doc.setFontSize(16);
-            doc.text('SURAT IZIN PULANG MENDAHULUI', 105, 20, { align: 'center' });
-            doc.setFontSize(12);
-            doc.text('SMA Negeri 1 Contoh', 105, 30, { align: 'center' });
-            doc.text('Jl. Pendidikan No. 123, Kota Contoh', 105, 35, { align: 'center' });
+      alert('Data berhasil ditambahkan!');
+      loadData();
+    }
 
-            // Content
-            doc.setFontSize(12);
-            doc.text('Kepada Yth.', 20, 50);
-            doc.text('Orang Tua/Wali Murid', 20, 55);
-            doc.text(`Nama: ${student.Name}`, 20, 65);
-            doc.text(`Kelas: ${student.Class}`, 20, 70);
-            doc.text(`Tanggal: ${student.Date}`, 20, 75);
-            doc.text(`Alasan: ${student.Reason}`, 20, 80);
+    async function loadData() {
+      const students = await fetchStudents();
+      const tbody = document.querySelector('#dataTable tbody');
+      tbody.innerHTML = '';
+      students.forEach(student => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${student.class}</td>
+          <td>${student.name}</td>
+          <td>${student.parentWhatsApp}</td>
+          <td>${student.case}</td>
+          <td>${student.score}</td>
+          <td>${student.lateStatus}</td>
+          <td>${student.earlyLeavePermission}</td>
+          <td>${student.date}</td>
+          <td>${student.reason}</td>
+          <td>${student.teacherSignature}</td>
+          <td>${student.picketTeacherSignature}</td>
+          <td>${student.classTeacherSignature}</td>
+          <td>
+            <button class="print-btn" onclick="printPermissionLetter(
+              '${student.name}',
+              '${student.class}',
+              '${student.date}',
+              '${student.reason}',
+              '${student.teacherSignature}',
+              '${student.picketTeacherSignature}',
+              '${student.classTeacherSignature}'
+            )">Cetak Surat Izin</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
 
-            doc.text('Dengan ini kami izinkan siswa tersebut untuk pulang mendahului dengan alasan yang telah disebutkan.', 20, 90, { maxWidth: 170 });
+    function printPermissionLetter(name, className, date, reason, teacherSignature, picketTeacherSignature, classTeacherSignature) {
+      document.getElementById('pdfStudentName').textContent = name;
+      document.getElementById('pdfClass').textContent = className;
+      document.getElementById('pdfDate').textContent = date;
+      document.getElementById('pdfReason').textContent = reason;
+      document.getElementById('pdfTeacherSignature').textContent = teacherSignature;
+      document.getElementById('pdfPicketTeacherSignature').textContent = picketTeacherSignature;
+      document.getElementById('pdfClassTeacherSignature').textContent = classTeacherSignature;
 
-            // Signatures
-            doc.text('Mengetahui,', 20, 110);
-            doc.text('Guru Mata Pelajaran', 20, 120);
-            doc.text(student.TeacherSignature, 20, 130);
-
-            doc.text('Guru Piket', 80, 120);
-            doc.text(student.PicketTeacherSignature, 80, 130);
-
-            doc.text('Wali Kelas', 140, 120);
-            doc.text(student.ClassTeacherSignature, 140, 130);
-
-            // Save PDF
-            doc.save(`Surat_Izin_${student.Name}_${student.Date}.pdf`);
-        };
-
-        // Tambah atau perbarui data
-        studentForm.addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const cls = classSelect.value;
-            const name = nameSelect.value;
-            const phone = phoneInput.value;
-            const caseInput = document.getElementById('case').value;
-            const score = document.getElementById('score').value;
-            const date = document.getElementById('date').value;
-            const lateStatus = document.getElementById('lateStatus').checked ? 'Yes' : 'No';
-            const earlyLeave = document.getElementById('earlyLeave').checked ? 'Yes' : 'No';
-            const reason = document.getElementById('reason').value;
-
-            if (validateInput(cls, name, phone, caseInput, score, date, lateStatus, earlyLeave, reason)) {
-                const student = {
-                    Class: cls,
-                    Name: name,
-                    ParentWhatsApp: phone,
-                    Case: caseInput || '',
-                    Score: score ? parseInt(score) : '',
-                    LateStatus: lateStatus,
-                    EarlyLeavePermission: earlyLeave,
-                    Date: date,
-                    Reason: earlyLeave === 'Yes' ? reason : '',
-                    TeacherSignature: "Guru Mapel",
-                    PicketTeacherSignature: "Guru Piket",
-                    ClassTeacherSignature: "Wali Kelas"
-                };
-
-                try {
-                    if (editRowIndex) {
-                        // Update
-                        await fetch(`${SHEETDB_API_URL}/id/${editRowIndex}`, {
-                            method: 'PATCH',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(student)
-                        });
-                    } else {
-                        // Add
-                        await fetch(SHEETDB_API_URL, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify([student])
-                        });
-                    }
-                    if (caseInput || lateStatus === 'Yes' || earlyLeave === 'Yes') {
-                        sendToWhatsApp(student);
-                    }
-                    await fetchStudents();
-                    studentForm.reset();
-                    classSelect.value = '';
-                    nameSelect.innerHTML = '<option value="">Pilih Nama Siswa</option>';
-                    phoneInput.value = '';
-                    document.getElementById('lateStatus').checked = false;
-                    document.getElementById('earlyLeave').checked = false;
-                    document.getElementById('reason').value = '';
-                    reasonDiv.classList.add('hidden');
-                    document.getElementById('date').value = new Date().toISOString().split('T')[0];
-                    editRowIndex = null;
-                    alert('Data berhasil disimpan!');
-                } catch (error) {
-                    alert('Terjadi kesalahan: ' + error.message);
-                }
-            }
-        });
-
-        // Edit data
-        window.editStudent = function(index) {
-            const student = students[index];
-            classSelect.value = student.Class;
-            fetchStudentsByClass(student.Class).then(() => {
-                nameSelect.value = student.Name;
-                phoneInput.value = student.ParentWhatsApp;
-            });
-            document.getElementById('case').value = student.Case;
-            document.getElementById('score').value = student.Score;
-            document.getElementById('date').value = student.Date;
-            document.getElementById('lateStatus').checked = student.LateStatus === 'Yes';
-            document.getElementById('earlyLeave').checked = student.EarlyLeavePermission === 'Yes';
-            document.getElementById('reason').value = student.Reason;
-            reasonDiv.classList.toggle('hidden', student.EarlyLeavePermission !== 'Yes');
-            editRowIndex = student.id;
-        };
-
-        // Hapus data
-        window.deleteStudent = async function(index) {
-            if (confirm('Yakin ingin menghapus data ini?')) {
-                try {
-                    await fetch(`${SHEETDB_API_URL}/id/${students[index].id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-                    await fetchStudents();
-                    alert('Data berhasil dihapus!');
-                } catch (error) {
-                    alert('Gagal menghapus data: ' + error.message);
-                }
-            }
-        };
-
-        // Pencarian
-        searchInput.addEventListener('input', function() {
-            const query = this.value.toLowerCase();
-            const filtered = students.filter(student =>
-                student.Class.toLowerCase().includes(query) ||
-                student.Name.toLowerCase().includes(query) ||
-                (student.Case && student.Case.toLowerCase().includes(query)) ||
-                (student.Reason && student.Reason.toLowerCase().includes(query)) ||
-                student.Date.toLowerCase().includes(query)
-            );
-            renderTable(filtered);
-        });
-
-        // Export ke CSV
-        exportCsvBtn.addEventListener('click', function() {
-            let csv = 'Kelas,Nama,No. WhatsApp,Kasus,Skor,Terlambat,Izin Pulang,Alasan,Tanggal\n';
-            students.forEach(student => {
-                csv += `${student.Class},${student.Name},${student.ParentWhatsApp},${student.Case || '-'},${student.Score || '-'},${student.LateStatus || 'No'},${student.EarlyLeavePermission || 'No'},${student.Reason || '-'},${student.Date || '-'}\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'data_siswa.csv';
-            a.click();
-            window.URL.revokeObjectURL(url);
-        });
-
-        // Event listener untuk dropdown kelas
-        classSelect.addEventListener('change', function() {
-            if (this.value) {
-                fetchStudentsByClass(this.value);
-            } else {
-                nameSelect.innerHTML = '<option value="">Pilih Nama Siswa</option>';
-                phoneInput.value = '';
-            }
-        });
-
-        // Event listener untuk dropdown nama
-        nameSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            phoneInput.value = selectedOption.dataset.phone || '';
-        });
-
-        // Set tanggal default ke hari ini
-        document.getElementById('date').value = new Date().toISOString().split('T')[0];
-    </script>
+      const element = document.getElementById('pdfContent');
+      html2pdf().from(element).set({
+        filename: `Surat_Izin_${name}_${date}.pdf`,
+        margin: 20,
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).save();
+    }
+  </script>
 </body>
 </html>
