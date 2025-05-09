@@ -1,0 +1,568 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pencatat Kasus dan Skor Siswa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 8px;
+            text-align: left;
+        }
+        #whatsappFrame {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="flex items-center justify-center min-h-screen">
+        <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-center mb-4">Login</h2>
+            <form id="loginForm" class="space-y-4">
+                <input type="text" id="username" placeholder="Username" class="w-full p-2 border rounded-md" required>
+                <input type="password" id="password" placeholder="Password" class="w-full p-2 border rounded-md" required>
+                <button type="submit" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 w-full">Login</button>
+                <p id="loginError" class="text-red-500 text-sm hidden">Username atau password salah.</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="container mx-auto p-4 max-w-6xl hidden">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Pencatat Kasus dan Skor Siswa</h1>
+        
+        <!-- Form Input -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <form id="studentForm" class="space-y-4">
+                <div>
+                    <select id="class" class="w-full p-2 border rounded-md" required>
+                        <option value="">Pilih Kelas</option>
+                    </select>
+                    <p id="classError" class="text-red-500 text-sm hidden">Kelas harus dipilih.</p>
+                </div>
+                <div>
+                    <select id="name" class="w-full p-2 border rounded-md" required>
+                        <option value="">Pilih Nama Siswa</option>
+                    </select>
+                    <p id="nameError" class="text-red-500 text-sm hidden">Nama harus dipilih.</p>
+                </div>
+                <div>
+                    <input type="tel" id="phone" placeholder="Nomor WhatsApp Orang Tua" class="w-full p-2 border rounded-md" readonly>
+                    <p id="phoneError" class="text-red-500 text-sm hidden">Nomor telepon tidak valid.</p>
+                </div>
+                <div>
+                    <input type="text" id="case" placeholder="Kasus" class="w-full p-2 border rounded-md">
+                    <p id="caseError" class="text-red-500 text-sm hidden">Kasus tidak boleh kosong jika diisi.</p>
+                </div>
+                <div>
+                    <input type="number" id="score" placeholder="Skor (0-100)" class="w-full p-2 border rounded-md">
+                    <p id="scoreError" class="text-red-500 text-sm hidden">Skor harus antara 0 dan 100.</p>
+                </div>
+                <div>
+                    <input type="date" id="date" class="w-full p-2 border rounded-md" required>
+                    <p id="dateError" class="text-red-500 text-sm hidden">Tanggal harus diisi.</p>
+                </div>
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="lateStatus" class="mr-2">
+                        <span>Terlambat</span>
+                    </label>
+                </div>
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="earlyLeave" class="mr-2">
+                        <span>Izin Pulang Mendahului</span>
+                    </label>
+                </div>
+                <div id="reasonDiv" class="hidden">
+                    <input type="text" id="reason" placeholder="Alasan Izin Pulang (misalnya: Acara Keluarga)" class="w-full p-2 border rounded-md">
+                    <p id="reasonError" class="text-red-500 text-sm hidden">Alasan harus diisi jika izin pulang dipilih.</p>
+                </div>
+                <button type="submit" class="bg-green-500 text-white p-2 rounded-md hover:bg-green-600 w-full">Tambah atau Perbarui Data</button>
+            </form>
+        </div>
+
+        <!-- Pencarian dan Export -->
+        <div class="bg-white p-4 rounded-lg shadow-md mb-6 flex flex-col sm:flex-row gap-4">
+            <input type="text" id="search" placeholder="Cari kelas, nama, kasus..." class="flex-grow p-2 border rounded-md">
+            <button id="exportCsv" class="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600">Export ke CSV</button>
+        </div>
+
+        <!-- Tabel Data -->
+        <div class="bg-white p-4 rounded-lg shadow-md overflow-x-auto">
+            <table id="studentTable">
+                <thead>
+                    <tr class="bg-blue-500 text-white">
+                        <th class="p-2 cursor-pointer" onclick="sortTable(0)">Kelas</th>
+                        <th class="p-2 cursor-pointer" onclick="sortTable(1)">Nama</th>
+                        <th class="p-2">No. WhatsApp</th>
+                        <th class="p-2">Kasus</th>
+                        <th class="p-2">Skor</th>
+                        <th class="p-2">Terlambat</th>
+                        <th class="p-2">Izin Pulang</th>
+                        <th class="p-2">Alasan</th>
+                        <th class="p-2 cursor-pointer" onclick="sortTable(7)">Tanggal</th>
+                        <th class="p-2">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="studentList"></tbody>
+            </table>
+        </div>
+
+        <!-- Iframe tersembunyi untuk WhatsApp -->
+        <iframe id="whatsappFrame"></iframe>
+    </div>
+
+    <script>
+        const loginScreen = document.getElementById('loginScreen');
+        const mainContent = document.getElementById('mainContent');
+        const loginForm = document.getElementById('loginForm');
+        const studentForm = document.getElementById('studentForm');
+        const studentList = document.getElementById('studentList');
+        const searchInput = document.getElementById('search');
+        const exportCsvBtn = document.getElementById('exportCsv');
+        const whatsappFrame = document.getElementById('whatsappFrame');
+        const classSelect = document.getElementById('class');
+        const nameSelect = document.getElementById('name');
+        const phoneInput = document.getElementById('phone');
+        const earlyLeaveCheckbox = document.getElementById('earlyLeave');
+        const reasonDiv = document.getElementById('reasonDiv');
+        let students = [];
+        let editRowIndex = null;
+
+        // Konfigurasi SheetDB
+        const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/9tnfjo3eoj9my'; // Ganti dengan SheetDB API URL
+        // Nomor WhatsApp tetap untuk semua pesan
+        const FIXED_WHATSAPP_NUMBER = '6285730809839'; // Ganti dengan nomor WhatsApp sekolah/admin
+
+        // Login sederhana (statis)
+        loginForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            if (username === 'admin' && password === 'password123') {
+                loginScreen.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+                fetchClasses();
+                fetchStudents();
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        });
+
+        // Tampilkan input alasan jika izin pulang dipilih
+        earlyLeaveCheckbox.addEventListener('change', function() {
+            reasonDiv.classList.toggle('hidden', !this.checked);
+        });
+
+        // Validasi input
+        function validateInput(cls, name, phone, caseInput, score, date, lateStatus, earlyLeave, reason) {
+            let isValid = true;
+            document.getElementById('classError').classList.add('hidden');
+            document.getElementById('nameError').classList.add('hidden');
+            document.getElementById('phoneError').classList.add('hidden');
+            document.getElementById('caseError').classList.add('hidden');
+            document.getElementById('scoreError').classList.add('hidden');
+            document.getElementById('dateError').classList.add('hidden');
+            document.getElementById('reasonError').classList.add('hidden');
+
+            if (!cls) {
+                document.getElementById('classError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (!name) {
+                document.getElementById('nameError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (!phone.match(/^\+?\d{10,15}$/)) {
+                document.getElementById('phoneError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (caseInput && !caseInput.trim()) {
+                document.getElementById('caseError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (score !== '' && (score < 0 || score > 100 || isNaN(score))) {
+                document.getElementById('scoreError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (!date) {
+                document.getElementById('dateError').classList.remove('hidden');
+                isValid = false;
+            }
+            if (earlyLeave === 'Yes' && !reason.trim()) {
+                document.getElementById('reasonError').classList.remove('hidden');
+                isValid = false;
+            }
+            return isValid;
+        }
+
+        // Ambil daftar kelas
+        async function fetchClasses() {
+            try {
+                const response = await fetch(SHEETDB_API_URL);
+                if (!response.ok) throw new Error('Gagal mengambil daftar kelas');
+                const data = await response.json();
+                const classes = [...new Set(data.map(row => row.Class))];
+                classSelect.innerHTML = '<option value="">Pilih Kelas</option>';
+                classes.forEach(cls => {
+                    const option = document.createElement('option');
+                    option.value = cls;
+                    option.textContent = cls;
+                    classSelect.appendChild(option);
+                });
+            } catch (error) {
+                alert('Error mengambil daftar kelas: ' + error.message);
+            }
+        }
+
+        // Ambil daftar siswa berdasarkan kelas
+        async function fetchStudentsByClass(cls) {
+            try {
+                const response = await fetch(`${SHEETDB_API_URL}?Class=${encodeURIComponent(cls)}`);
+                if (!response.ok) throw new Error('Gagal mengambil daftar siswa');
+                const data = await response.json();
+                nameSelect.innerHTML = '<option value="">Pilih Nama Siswa</option>';
+                data.forEach(row => {
+                    const option = document.createElement('option');
+                    option.value = row.Name;
+                    option.textContent = row.Name;
+                    option.dataset.phone = row.ParentWhatsApp;
+                    nameSelect.appendChild(option);
+                });
+            } catch (error) {
+                alert('Error mengambil daftar siswa: ' + error.message);
+            }
+        }
+
+        // Ambil semua data siswa
+        async function fetchStudents() {
+            try {
+                const response = await fetch(SHEETDB_API_URL);
+                if (!response.ok) throw new Error('Gagal mengambil data siswa');
+                const data = await response.json();
+                students = data.map((row, index) => ({
+                    id: index + 2, // Baris dimulai dari 2 karena header
+                    Class: row.Class,
+                    Name: row.Name,
+                    ParentWhatsApp: row.ParentWhatsApp,
+                    Case: row.Case,
+                    Score: row.Score,
+                    LateStatus: row.LateStatus,
+                    EarlyLeavePermission: row.EarlyLeavePermission,
+                    Date: row.Date,
+                    Reason: row.Reason,
+                    TeacherSignature: row.TeacherSignature,
+                    PicketTeacherSignature: row.PicketTeacherSignature,
+                    ClassTeacherSignature: row.ClassTeacherSignature
+                }));
+                renderTable();
+            } catch (error) {
+                alert('Error mengambil data siswa: ' + error.message);
+            }
+        }
+
+        // Render tabel
+        function renderTable(data = students) {
+            studentList.innerHTML = '';
+            data.forEach((student, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${student.Class}</td>
+                    <td>${student.Name}</td>
+                    <td>${student.ParentWhatsApp}</td>
+                    <td>${student.Case || '-'}</td>
+                    <td>${student.Score || '-'}</td>
+                    <td>${student.LateStatus || 'No'}</td>
+                    <td>${student.EarlyLeavePermission || 'No'}</td>
+                    <td>${student.Reason || '-'}</td>
+                    <td>${student.Date || '-'}</td>
+                    <td>
+                        <button onclick="editStudent(${index})" class="bg-yellow-500 text-white p-1 rounded hover:bg-yellow-600 mr-2">Edit</button>
+                        <button onclick="deleteStudent(${index})" class="bg-red-500 text-white p-1 rounded hover:bg-red-600 mr-2">Hapus</button>
+                        ${student.EarlyLeavePermission === 'Yes' ? `<button onclick="printPermit(${index})" class="bg-purple-500 text-white p-1 rounded hover:bg-purple-600">Cetak Surat Izin</button>` : ''}
+                    </td>
+                `;
+                studentList.appendChild(row);
+            });
+        }
+
+        // Sort tabel
+        let sortDirection = 1;
+        let lastSortedColumn = -1;
+        window.sortTable = function(col) {
+            if (lastSortedColumn === col) {
+                sortDirection *= -1;
+            } else {
+                sortDirection = 1;
+            }
+            lastSortedColumn = col;
+            students.sort((a, b) => {
+                const valA = a[Object.keys(a)[col + 1]] || ''; // +1 karena id di awal
+                const valB = b[Object.keys(b)[col + 1]] || '';
+                return sortDirection * (valA.toString().localeCompare(valB.toString()));
+            });
+            renderTable();
+        };
+
+        // Kirim ke WhatsApp
+        function sendToWhatsApp(student) {
+            let message = `Notifikasi dari SMA Negeri 1 Contoh\n`;
+            message += `Kepada Orang Tua/Wali ${student.Name} (Kelas ${student.Class}),\n`;
+            message += `Tanggal: ${student.Date}\n`;
+            if (student.Case) {
+                message += `Siswa Anda memiliki catatan:\n- Kasus: ${student.Case}\n- Skor: ${student.Score}\n`;
+            }
+            if (student.LateStatus === 'Yes') {
+                message += `- Status: Terlambat\n`;
+            }
+            if (student.EarlyLeavePermission === 'Yes') {
+                message += `- Izin: Pulang Mendahului\n- Alasan: ${student.Reason}\n`;
+            }
+            message += `Terima kasih.`;
+            const url = `https://wa.me/${FIXED_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+            whatsappFrame.src = url;
+            window.open(url, '_blank');
+        }
+
+        // Cetak surat izin
+        window.printPermit = function(index) {
+            const student = students[index];
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Header
+            doc.setFontSize(16);
+            doc.text('SURAT IZIN PULANG MENDAHULUI', 105, 20, { align: 'center' });
+            doc.setFontSize(12);
+            doc.text('SMA Negeri 1 Contoh', 105, 30, { align: 'center' });
+            doc.text('Jl. Pendidikan No. 123, Kota Contoh', 105, 35, { align: 'center' });
+
+            // Content
+            doc.setFontSize(12);
+            doc.text('Kepada Yth.', 20, 50);
+            doc.text('Orang Tua/Wali Murid', 20, 55);
+            doc.text(`Nama: ${student.Name}`, 20, 65);
+            doc.text(`Kelas: ${student.Class}`, 20, 70);
+            doc.text(`Tanggal: ${student.Date}`, 20, 75);
+            doc.text(`Alasan: ${student.Reason}`, 20, 80);
+
+            doc.text('Dengan ini kami izinkan siswa tersebut untuk pulang mendahului dengan alasan yang telah disebutkan.', 20, 90, { maxWidth: 170 });
+
+            // Signatures
+            doc.text('Mengetahui,', 20, 110);
+            doc.text('Guru Mata Pelajaran', 20, 120);
+            doc.text(student.TeacherSignature, 20, 130);
+
+            doc.text('Guru Piket', 80, 120);
+            doc.text(student.PicketTeacherSignature, 80, 130);
+
+            doc.text('Wali Kelas', 140, 120);
+            doc.text(student.ClassTeacherSignature, 140, 130);
+
+            // Save PDF
+            doc.save(`Surat_Izin_${student.Name}_${student.Date}.pdf`);
+        };
+
+        // Tambah atau perbarui data
+        studentForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const cls = classSelect.value;
+            const name = nameSelect.value;
+            const phone = phoneInput.value;
+            const caseInput = document.getElementById('case').value;
+            const score = document.getElementById('score').value;
+            const date = document.getElementById('date').value;
+            const lateStatus = document.getElementById('lateStatus').checked ? 'Yes' : 'No';
+            const earlyLeave = document.getElementById('earlyLeave').checked ? 'Yes' : 'No';
+            const reason = document.getElementById('reason').value;
+
+            if (validateInput(cls, name, phone, caseInput, score, date, lateStatus, earlyLeave, reason)) {
+                const student = {
+                    Class: cls,
+                    Name: name,
+                    ParentWhatsApp: phone,
+                    Case: caseInput || '',
+                    Score: score ? parseInt(score) : '',
+                    LateStatus: lateStatus,
+                    EarlyLeavePermission: earlyLeave,
+                    Date: date,
+                    Reason: earlyLeave === 'Yes' ? reason : '',
+                    TeacherSignature: "Guru Mapel",
+                    PicketTeacherSignature: "Guru Piket",
+                    ClassTeacherSignature: "Wali Kelas"
+                };
+
+                try {
+                    if (editRowIndex) {
+                        // Update
+                        await fetch(`${SHEETDB_API_URL}/id/${editRowIndex}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(student)
+                        });
+                    } else {
+                        // Add
+                        await fetch(SHEETDB_API_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify([student])
+                        });
+                    }
+                    if (caseInput || lateStatus === 'Yes' || earlyLeave === 'Yes') {
+                        sendToWhatsApp(student);
+                    }
+                    await fetchStudents();
+                    studentForm.reset();
+                    classSelect.value = '';
+                    nameSelect.innerHTML = '<option value="">Pilih Nama Siswa</option>';
+                    phoneInput.value = '';
+                    document.getElementById('lateStatus').checked = false;
+                    document.getElementById('earlyLeave').checked = false;
+                    document.getElementById('reason').value = '';
+                    reasonDiv.classList.add('hidden');
+                    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+                    editRowIndex = null;
+                    alert('Data berhasil disimpan!');
+                } catch (error) {
+                    alert('Terjadi kesalahan: ' + error.message);
+                }
+            }
+        });
+
+        // Edit data
+        window.editStudent = function(index) {
+            const student = students[index];
+            classSelect.value = student.Class;
+            fetchStudentsByClass(student.Class).then(() => {
+                nameSelect.value = student.Name;
+                phoneInput.value = student.ParentWhatsApp;
+            });
+            document.getElementById('case').value = student.Case;
+            document.getElementById('score').value = student.Score;
+            document.getElementById('date').value = student.Date;
+            document.getElementById('lateStatus').checked = student.LateStatus === 'Yes';
+            document.getElementById('earlyLeave').checked = student.EarlyLeavePermission === 'Yes';
+            document.getElementById('reason').value = student.Reason;
+            reasonDiv.classList.toggle('hidden', student.EarlyLeavePermission !== 'Yes');
+            editRowIndex = student.id;
+        };
+
+        // Hapus data
+        window.deleteStudent = async function(index) {
+            if (confirm('Yakin ingin menghapus data ini?')) {
+                try {
+                    await fetch(`${SHEETDB_API_URL}/id/${students[index].id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    await fetchStudents();
+                    alert('Data berhasil dihapus!');
+                } catch (error) {
+                    alert('Gagal menghapus data: ' + error.message);
+                }
+            }
+        };
+
+        // Pencarian
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            const filtered = students.filter(student =>
+                student.Class.toLowerCase().includes(query) ||
+                student.Name.toLowerCase().includes(query) ||
+                (student.Case && student.Case.toLowerCase().includes(query)) ||
+                (student.Reason && student.Reason.toLowerCase().includes(query)) ||
+                student.Date.toLowerCase().includes(query)
+            );
+            renderTable(filtered);
+        });
+
+        // Export ke CSV
+        exportCsvBtn.addEventListener('click', function() {
+            let csv = 'Kelas,Nama,No. WhatsApp,Kasus,Skor,Terlambat,Izin Pulang,Alasan,Tanggal\n';
+            students.forEach(student => {
+                csv += `${student.Class},${student.Name},${student.ParentWhatsApp},${student.Case || '-'},${student.Score || '-'},${student.LateStatus || 'No'},${student.EarlyLeavePermission || 'No'},${student.Reason || '-'},${student.Date || '-'}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'data_siswa.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+
+        // Event listener untuk dropdown kelas
+        classSelect.addEventListener('change', function() {
+            if (this.value) {
+                fetchStudentsByClass(this.value);
+            } else {
+                nameSelect.innerHTML = '<option value="">Pilih Nama Siswa</option>';
+                phoneInput.value = '';
+            }
+        });
+
+        // Event listener untuk dropdown nama
+        nameSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            phoneInput.value = selectedOption.dataset.phone || '';
+        });
+
+        // Set tanggal default ke hari ini
+        document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    </script>
+</body>
+</html>
